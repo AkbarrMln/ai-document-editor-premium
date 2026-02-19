@@ -49,6 +49,8 @@ export const metadata: Metadata = {
   },
 };
 
+import { AuthProvider } from "@/components/AuthProvider";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -62,7 +64,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
-      <body className={`${inter.className} antialiased`}>
+      <body className={`${inter.className} antialiased`} suppressHydrationWarning>
         {/* Set tema sebelum React hydration */}
         <script
           dangerouslySetInnerHTML={{
@@ -79,8 +81,10 @@ export default function RootLayout({
             } catch (e) {} })();`,
           }}
         />
-        {children}
-        <LazyChatWidget />
+        <AuthProvider>
+          {children}
+          <LazyChatWidget />
+        </AuthProvider>
       </body>
     </html>
   );
