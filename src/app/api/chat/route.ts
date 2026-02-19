@@ -59,7 +59,7 @@ If you are analyzing a file (image/pdf/etc), use its context to help the user ed
 
         contentParts.push({ text: userMessage.content })
 
-        const modelName = 'gemini-2.0-flash' // Standard model name
+        const modelName = 'gemini-2.5-flash' // Updated to experimental flash model
 
         // Prepare history
         const history = messages.slice(0, -1).map((m: any) => ({
