@@ -15,6 +15,7 @@ export default function LoginPage() {
     const router = useRouter()
 
     useEffect(() => {
+        console.log('Login Page Mounted')
         if (user) {
             router.push('/ai-editor')
         }
