@@ -11,7 +11,6 @@
  */
 export async function generateImage(prompt: string): Promise<string | null> {
     try {
-        console.log('🎨 Generating image with Pollinations AI, prompt:', prompt)
 
         // Pollinations AI menggunakan URL encoding untuk prompt
         const encodedPrompt = encodeURIComponent(prompt)
@@ -20,7 +19,6 @@ export async function generateImage(prompt: string): Promise<string | null> {
         // Format: https://image.pollinations.ai/prompt/{prompt}?width=512&height=512&nologo=true
         const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true&seed=${Date.now()}`
 
-        console.log('📡 Fetching image from:', imageUrl)
 
         // Fetch gambar dari Pollinations AI
         const response = await fetch(imageUrl)
@@ -37,7 +35,6 @@ export async function generateImage(prompt: string): Promise<string | null> {
         // Detect MIME type dari response header
         const contentType = response.headers.get('content-type') || 'image/jpeg'
 
-        console.log('✅ Image generated successfully, size:', arrayBuffer.byteLength, 'bytes')
 
         // Return base64 dengan proper data URI prefix
         return `data:${contentType};base64,${base64}`

@@ -65,7 +65,7 @@ export default function ChatWidget() {
             beep(1200, now, 0.12, 0.12);
             beep(1600, now + 0.18, 0.14, 0.12);
         } catch (error) {
-            console.log('Audio notification unavailable');
+            // Audio notification unavailable
         }
     };
 
