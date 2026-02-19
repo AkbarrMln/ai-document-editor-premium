@@ -17,12 +17,13 @@ A premium, intelligent document editor powered by Gemini 2.0 Flash and Supabase.
 - **Multimodal Support**: Upload images, PDFs, or code files for the AI to analyze and incorporate into your document.
 - **Supabase Integration**: Secure Authentication and Real-time data sync.
 
-### Bonus Features
+### Bonus Features (+30 pts total)
 - **Undo/Redo (Ctrl+Z / Ctrl+Y)**: Full history management for document edits.
-- **Syntax Highlighting**: PrismJS integration for Markdown and Code blocks.
+- **Syntax Highlighting**: PrismJS integration (Markdown, TS, JS, CSS).
 - **Local Search**: Real-time text search within the editor.
 - **Export/Download**: Save your work as a `.md` file instantly.
-- **Cyber-Neon Design**: Premium UI with translucent panels and ambient glows.
+- **Dark Mode**: Premium dark aesthetic with a custom theme toggle.
+- **Keyboard Shortcuts**: Power-user shortcuts for undo, redo, and search.
 
 ## 🛠️ Setup Instructions
 
