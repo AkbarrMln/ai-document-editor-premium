@@ -82,6 +82,12 @@ Open [http://localhost:3000](http://localhost:3000)
 2. Type: `"Rangkum isi file ini dan masukkan ke dokumen"`
 3. AI will analyze the image and use tools to update your document.
 
+## ⚠️ Known Limitations
+
+- **Context Window**: While Gemini 2.0 Flash has a large context, extremely long documents (10k+ lines) might slow down the response time or exceed input tokens when sent frequently.
+- **Single User Sync**: The current real-time implementation is optimized for single-user editing. Concurrent editing by multiple users on the same document may lead to "last-write-wins" conflicts.
+- **Latency**: There is a 2-second debounce on auto-save to optimize Supabase performance; closing the tab immediately after a large edit might result in small data loss.
+
 ## 🎓 Learning Reflection
 
 - **Technical Challenge**: Handling turn-taking and property naming in the `@google/genai` SDK was challenging. Unlike the older SDK, properties like `functionCalls` and `inlineData` must follow specific camelCase patterns within the `contents` array.
