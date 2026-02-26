@@ -199,9 +199,7 @@ export default function DocumentEditor({ content, onChange, collaborators = [], 
             style={{ ...sharedStyles, pointerEvents: 'none', zIndex: 0, overflow: 'hidden', background: 'transparent' }}
             aria-hidden="true"
           >
-            <code ref={codeRef} className="language-markdown block dark:text-gray-300">
-              {content + (content.endsWith('\n') ? ' ' : '')}
-            </code>
+            <code ref={codeRef} className="language-markdown block dark:text-gray-300">{content + (content.endsWith('\n') ? ' ' : '')}</code>
           </pre>
 
           <CursorOverlay
