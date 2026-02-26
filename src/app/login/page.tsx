@@ -36,8 +36,9 @@ export default function LoginPage() {
                 if (error) throw error
                 router.push('/ai-editor')
             }
-        } catch (error: any) {
-            setMessage(error.message)
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : 'Login failed'
+            setMessage(msg)
         } finally {
             setLoading(false)
         }

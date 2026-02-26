@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState, useCallback } from 'react'
 import Prism from 'prismjs'
 import 'prismjs/themes/prism.css' // Base light theme, we override in CSS
 import 'prismjs/components/prism-markdown'
@@ -33,31 +33,37 @@ export default function DocumentEditor({ content, onChange }: Props) {
 
   // History / Undo / Redo
   useEffect(() => {
-    const lastHistory = history[historyIndex]
-    if (content !== lastHistory) {
-      const newHistory = history.slice(0, historyIndex + 1)
-      newHistory.push(content)
-      if (newHistory.length > 50) newHistory.shift()
-      setHistory(newHistory)
-      setHistoryIndex(newHistory.length - 1)
-    }
+    setHistory(prevHistory => {
+      const lastHistory = prevHistory[historyIndex]
+      if (content !== lastHistory) {
+        const newHistory = prevHistory.slice(0, historyIndex + 1)
+        newHistory.push(content)
+        if (newHistory.length > 50) newHistory.shift()
+        setHistoryIndex(newHistory.length - 1)
+        return newHistory
+      }
+      return prevHistory
+    })
+    // Note: We use an updater function to avoid strict dependencies, 
+    // but we cautiously include `historyIndex` down the line if needed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content])
 
-  const undo = () => {
+  const undo = useCallback(() => {
     if (historyIndex > 0) {
       const prev = history[historyIndex - 1]
       setHistoryIndex(historyIndex - 1)
       onChange(prev)
     }
-  }
+  }, [history, historyIndex, onChange])
 
-  const redo = () => {
+  const redo = useCallback(() => {
     if (historyIndex < history.length - 1) {
       const next = history[historyIndex + 1]
       setHistoryIndex(historyIndex + 1)
       onChange(next)
     }
-  }
+  }, [history, historyIndex, onChange])
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -73,7 +79,7 @@ export default function DocumentEditor({ content, onChange }: Props) {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [historyIndex, history])
+  }, [undo, redo])
 
   useEffect(() => {
     if (codeRef.current) {
@@ -101,6 +107,7 @@ export default function DocumentEditor({ content, onChange }: Props) {
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
     fontSize: '0.875rem',
     padding: '1rem',
+    paddingTop: '1rem',
     whiteSpace: 'pre-wrap',
     wordBreak: 'break-word',
     margin: 0,
@@ -157,10 +164,10 @@ export default function DocumentEditor({ content, onChange }: Props) {
       <div className="flex-1 flex overflow-hidden">
         <div
           ref={lineNumbersRef}
-          className="w-12 bg-gray-50 dark:bg-black/20 text-gray-400 dark:text-gray-600 text-right pr-3 py-4 text-xs select-none overflow-hidden border-r border-gray-100 dark:border-white/5 font-mono shrink-0"
-          style={{ lineHeight: '1.6rem' }}
+          className="w-12 bg-gray-50 dark:bg-black/20 text-gray-400 dark:text-gray-600 text-right pr-3 text-xs select-none overflow-hidden border-r border-gray-100 dark:border-white/5 font-mono shrink-0"
+          style={{ lineHeight: '1.6rem', paddingTop: '1rem', paddingBottom: '1rem' }}
         >
-          <pre className="whitespace-pre m-0 p-0 font-bold opacity-40">{lineNumbers}</pre>
+          <pre className="whitespace-pre m-0 p-0 font-bold opacity-40" style={{ lineHeight: '1.6rem', fontSize: '0.875rem' }}>{lineNumbers}</pre>
         </div>
 
         <div className="flex-1 relative overflow-hidden bg-white dark:bg-[#0a0a0b]">

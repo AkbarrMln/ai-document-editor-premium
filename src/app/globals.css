@@ -86,3 +86,22 @@ body {
 .dark .token.variable {
 	color: #f1fa8c;
 }
+
+/* Reset Prism default padding/margin on pre and code to prevent line misalignment */
+pre[class*="language-"],
+code[class*="language-"] {
+	padding: 0;
+	margin: 0;
+	background: transparent;
+}
+
+/* Dark mode: make plain (non-token) text visible */
+.dark code[class*="language-"],
+.dark pre[class*="language-"] {
+	color: #e0e0e0;
+}
+
+/* Fix textarea placeholder in dark mode */
+.dark textarea::placeholder {
+	color: #555;
+}

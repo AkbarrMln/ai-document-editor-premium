@@ -13,6 +13,7 @@
     "@supabase/supabase-js": "^2.96.0",
     "@types/prismjs": "^1.26.6",
     "lucide-react": "^0.562.0",
+    "nanoid": "^5.1.6",
     "next": "16.1.1",
     "prismjs": "^1.30.0",
     "react": "19.2.3",

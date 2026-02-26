@@ -2,12 +2,24 @@
 
 import { useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
+
+interface DocumentRow {
+    id: string
+    content: string
+    title: string
+    user_id: string
+    updated_at: string
+    created_at: string
+}
 
 export function useRealtimeDocument(
-    documentId: string,
+    documentId: string | null,
     onUpdate: (content: string) => void
 ) {
     useEffect(() => {
+        if (!documentId) return
+
         const channel = supabase
             .channel(`document:${documentId}`)
             .on(
@@ -18,13 +30,15 @@ export function useRealtimeDocument(
                     table: 'documents',
                     filter: `id=eq.${documentId}`
                 },
-                (payload: any) => {
-                    onUpdate(payload.new.content)
+                (payload: RealtimePostgresChangesPayload<DocumentRow>) => {
+                    const newRecord = payload.new as DocumentRow
+                    if (newRecord.content) {
+                        onUpdate(newRecord.content)
+                    }
                 }
             )
             .subscribe()
 
-        // Proper cleanup
         return () => {
             supabase.removeChannel(channel)
         }

@@ -15,11 +15,16 @@ export default function LazyChatWidget() {
     useEffect(() => {
         // Delay loading the chat widget by a small amount to prioritize LCP content
         // RequestIdleCallback is ideal, with fallback to setTimeout
-        if ('requestIdleCallback' in window) {
-            const handle = (window as any).requestIdleCallback(() => {
+        const win = window as unknown as {
+            requestIdleCallback?: (cb: () => void) => number;
+            cancelIdleCallback?: (id: number) => void
+        };
+
+        if (win.requestIdleCallback && win.cancelIdleCallback) {
+            const handle = win.requestIdleCallback(() => {
                 setShouldLoad(true);
             });
-            return () => (window as any).cancelIdleCallback(handle);
+            return () => win.cancelIdleCallback!(handle);
         } else {
             const timer = setTimeout(() => {
                 setShouldLoad(true);

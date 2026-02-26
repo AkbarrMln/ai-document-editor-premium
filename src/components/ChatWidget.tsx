@@ -36,7 +36,7 @@ export default function ChatWidget() {
 
     const ensureAudioContext = async () => {
         if (!audioCtxRef.current) {
-            const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
+            const AC = (window as unknown as Record<string, typeof AudioContext>).AudioContext || (window as unknown as Record<string, typeof AudioContext>).webkitAudioContext;
             audioCtxRef.current = new AC();
         }
         if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
@@ -64,7 +64,7 @@ export default function ChatWidget() {
             const now = ctx.currentTime;
             beep(1200, now, 0.12, 0.12);
             beep(1600, now + 0.18, 0.14, 0.12);
-        } catch (error) {
+        } catch {
             console.log('Audio notification unavailable');
         }
     };
@@ -88,8 +88,8 @@ export default function ChatWidget() {
         const savedMessages = localStorage.getItem('chatbot-history');
         if (savedMessages) {
             try {
-                const parsed = JSON.parse(savedMessages);
-                setMessages(parsed.map((msg: any) => ({
+                const parsed = JSON.parse(savedMessages) as Array<Omit<Message, 'timestamp'> & { timestamp: number | string }>;
+                setMessages(parsed.map((msg) => ({
                     ...msg,
                     timestamp: new Date(msg.timestamp)
                 })));
@@ -208,7 +208,7 @@ export default function ChatWidget() {
             }
 
             playMobileNotif();
-        } catch (error) {
+        } catch {
             setIsTyping(false);
             const errorMsg: Message = {
                 id: Date.now() + 1,
@@ -278,7 +278,7 @@ export default function ChatWidget() {
     };
 
     // Handler download gambar
-    const handleDownloadImage = (imageData: string, prompt?: string) => {
+    const handleDownloadImage = (imageData: string) => {
         try {
             // Convert base64 to blob
             const byteString = atob(imageData.split(',')[1]);
@@ -315,7 +315,7 @@ export default function ChatWidget() {
             ]);
             setImageCopySuccess(true);
             setTimeout(() => setImageCopySuccess(false), 2000);
-        } catch (error) {
+        } catch {
             // Fallback: copy base64 URL
             try {
                 await navigator.clipboard.writeText(imageData);
@@ -442,7 +442,8 @@ export default function ChatWidget() {
                                             <ReactMarkdown
                                                 remarkPlugins={[remarkGfm]}
                                                 components={{
-                                                    code({ inline, className, children, ...props }: any) {
+                                                    code(props: React.ComponentPropsWithoutRef<'code'> & { inline?: boolean }) {
+                                                        const { inline, className, children, ...rest } = props;
                                                         const match = /language-(\w+)/.exec(className || '');
                                                         return !inline && match ? (
                                                             <div className="rounded-xl overflow-hidden my-2 sm:my-3 border border-zinc-200 dark:border-zinc-700">
@@ -453,7 +454,7 @@ export default function ChatWidget() {
                                                                 </div>
                                                             </div>
                                                         ) : (
-                                                            <code className="bg-zinc-100 dark:bg-zinc-700 px-1.5 py-0.5 rounded-md text-pink-500 text-[12px] sm:text-[13px] font-mono" {...props}>
+                                                            <code className="bg-zinc-100 dark:bg-zinc-700 px-1.5 py-0.5 rounded-md text-pink-500 text-[12px] sm:text-[13px] font-mono" {...rest}>
                                                                 {children}
                                                             </code>
                                                         );
@@ -487,7 +488,7 @@ export default function ChatWidget() {
                                                         <Maximize2 className="w-3.5 h-3.5 text-gray-700 dark:text-gray-200" />
                                                     </button>
                                                     <button
-                                                        onClick={(e) => { e.stopPropagation(); handleDownloadImage(message.image!, message.imagePrompt); }}
+                                                        onClick={(e) => { e.stopPropagation(); handleDownloadImage(message.image!); }}
                                                         className="p-1.5 bg-white/90 dark:bg-zinc-800/90 rounded-lg shadow-lg hover:bg-white dark:hover:bg-zinc-700 transition-colors"
                                                         title="Download"
                                                     >
@@ -635,7 +636,7 @@ export default function ChatWidget() {
                         {/* Action buttons */}
                         <div className="absolute top-4 right-4 flex gap-2">
                             <button
-                                onClick={() => handleDownloadImage(lightboxImage, lightboxPrompt || undefined)}
+                                onClick={() => handleDownloadImage(lightboxImage)}
                                 className="p-2 bg-white/90 dark:bg-zinc-800/90 rounded-lg shadow-lg hover:bg-white dark:hover:bg-zinc-700 transition-colors"
                                 title="Download"
                             >
@@ -711,7 +712,7 @@ export default function ChatWidget() {
                                         />
                                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100">
                                             <button
-                                                onClick={() => handleDownloadImage(img.image, img.prompt)}
+                                                onClick={() => handleDownloadImage(img.image)}
                                                 className="p-1.5 bg-white/90 rounded-lg shadow-lg hover:bg-white transition-colors"
                                                 title="Download"
                                             >

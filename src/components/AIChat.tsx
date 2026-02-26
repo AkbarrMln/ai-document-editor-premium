@@ -4,18 +4,25 @@ import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
+interface FunctionCallInfo {
+    name: string
+    args: Record<string, unknown>
+    result?: Record<string, unknown>
+}
+
 interface Message {
     role: 'user' | 'assistant'
     content: string
-    functionCall?: { name: string; args: any }
+    functionCall?: FunctionCallInfo
 }
 
 interface Props {
     documentContent: string
     onDocumentUpdate: (newContent: string) => void
+    readOnly?: boolean
 }
 
-export default function AIChat({ documentContent, onDocumentUpdate }: Props) {
+export default function AIChat({ documentContent, onDocumentUpdate, readOnly = false }: Props) {
     const [messages, setMessages] = useState<Message[]>([])
     const [input, setInput] = useState('')
     const [isLoading, setIsLoading] = useState(false)
@@ -25,7 +32,7 @@ export default function AIChat({ documentContent, onDocumentUpdate }: Props) {
         const file = e.target.files?.[0]
         if (!file) return
 
-        if (file.size > 20 * 1024 * 1024) { // Increased to 20MB
+        if (file.size > 20 * 1024 * 1024) {
             alert('File must be less than 20MB')
             return
         }
@@ -34,7 +41,7 @@ export default function AIChat({ documentContent, onDocumentUpdate }: Props) {
         reader.onload = () => {
             setSelectedFile({
                 data: reader.result as string,
-                type: file.type || 'application/octet-stream' // Fallback mime type
+                type: file.type || 'application/octet-stream'
             })
         }
         reader.readAsDataURL(file)
@@ -73,13 +80,14 @@ export default function AIChat({ documentContent, onDocumentUpdate }: Props) {
 
             setMessages(prev => [...prev, data.message])
             setSelectedFile(null)
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error'
             console.error('Chat error:', error)
             setMessages(prev => [...prev, {
                 role: 'assistant',
-                content: `❌ Error: ${error.message}. Please try again.`
+                content: `❌ Error: ${message}. Please try again.`
             }])
-            setInput(currentInput) // Restore input on error
+            setInput(currentInput)
         } finally {
             setIsLoading(false)
         }
@@ -89,6 +97,20 @@ export default function AIChat({ documentContent, onDocumentUpdate }: Props) {
         if (confirm('Clear chat history?')) {
             setMessages([])
         }
+    }
+
+    if (readOnly) {
+        return (
+            <div className="flex items-center justify-center h-full bg-white dark:bg-[#0a0a0b] border-l border-gray-200 dark:border-white/5">
+                <div className="text-center text-gray-500 dark:text-gray-400 p-8">
+                    <svg className="w-12 h-12 mx-auto mb-3 opacity-30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    <p className="text-sm font-medium">AI Chat disabled</p>
+                    <p className="text-xs mt-1 opacity-60">View-only mode</p>
+                </div>
+            </div>
+        )
     }
 
     return (

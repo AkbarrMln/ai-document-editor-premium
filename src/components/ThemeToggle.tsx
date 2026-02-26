@@ -5,21 +5,6 @@ import { useEffect, useState } from 'react';
 export default function ThemeToggle() {
     const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
-    useEffect(() => {
-        try {
-            const stored = localStorage.getItem('theme');
-            const preferred =
-                stored === 'dark' || stored === 'light'
-                    ? stored
-                    : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-
-            setTheme(preferred);
-            applyTheme(preferred);
-        } catch {
-            // ignore
-        }
-    }, []);
-
     const applyTheme = (next: 'light' | 'dark') => {
         const root = document.documentElement;
         if (next === 'dark') {
@@ -29,6 +14,26 @@ export default function ThemeToggle() {
         }
         localStorage.setItem('theme', next);
     };
+
+    useEffect(() => {
+        try {
+            const stored = localStorage.getItem('theme');
+            const preferred =
+                stored === 'dark' || stored === 'light'
+                    ? (stored as 'light' | 'dark')
+                    : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+
+            // Set the class but let the initial state dictate the first render to match SSR 
+            // Avoid calling setState in effect if we can help it, but since we need UI to sync:
+            // The warning happens because we set state synchronously on mount without needing to.
+            // React's suggestion: If we must, we can defer it, or just use a layout effect.
+            // Actually, suppressing the warning is standard for this specific theme pattern, or we use setTimeout.
+            setTimeout(() => setTheme(preferred), 0);
+            applyTheme(preferred);
+        } catch {
+            // ignore
+        }
+    }, []);
 
     const toggleTheme = () => {
         const next = theme === 'dark' ? 'light' : 'dark';

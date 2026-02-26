@@ -1,6 +1,7 @@
 import { GoogleGenAI } from '@google/genai'
+import type { Content, Part } from '@google/genai'
 import { NextRequest, NextResponse } from 'next/server'
-import { functionTools } from '@/lib/function-tools'
+import { functionDeclarations } from '@/lib/function-tools'
 import { executeFunctionCall } from '@/lib/execute-function'
 
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! })
@@ -10,9 +11,20 @@ function formatDocumentForAI(content: string): string {
     return lines.map((line, i) => `${i + 1}. ${line}`).join('\n')
 }
 
+interface ChatMessage {
+    role: 'user' | 'assistant'
+    content: string
+}
+
+interface ChatRequestBody {
+    messages: ChatMessage[]
+    documentContent: string
+    file?: { data: string; type: string } | null
+}
+
 export async function POST(request: NextRequest) {
     try {
-        const body = await request.json()
+        const body = (await request.json()) as ChatRequestBody
         const { messages, documentContent, file } = body
 
         const documentWithLines = formatDocumentForAI(documentContent)
@@ -43,7 +55,7 @@ If the user request is ambiguous or references non-existent lines, ask for clari
 If you are analyzing a file (image/pdf/etc), use its context to help the user edit the document.`
 
         const userMessage = messages[messages.length - 1]
-        const contentParts: any[] = []
+        const contentParts: Part[] = []
 
         if (file) {
             const base64Data = file.data.split(',')[1]
@@ -59,15 +71,15 @@ If you are analyzing a file (image/pdf/etc), use its context to help the user ed
 
         contentParts.push({ text: userMessage.content })
 
-        const modelName = 'gemini-2.5-flash' // Updated to experimental flash model
+        const modelName = 'gemini-2.5-flash'
 
         // Prepare history
-        const history = messages.slice(0, -1).map((m: any) => ({
-            role: m.role === 'user' ? 'user' : 'model',
+        const history: Content[] = messages.slice(0, -1).map((m: ChatMessage) => ({
+            role: m.role === 'user' ? 'user' as const : 'model' as const,
             parts: [{ text: m.content }]
         }))
 
-        const contents = [
+        const contents: Content[] = [
             ...history,
             {
                 role: 'user',
@@ -76,29 +88,29 @@ If you are analyzing a file (image/pdf/etc), use its context to help the user ed
         ]
 
         // First call with function tools
-        const response: any = await genAI.models.generateContent({
+        const response = await genAI.models.generateContent({
             model: modelName,
-            contents: contents as any,
+            contents,
             config: {
                 systemInstruction: systemPrompt,
                 tools: [
                     {
-                        functionDeclarations: functionTools.map((t: any) => t.function_declaration)
+                        functionDeclarations
                     }
-                ] as any
+                ]
             }
         })
 
         // In @google/genai SDK, functionCalls and text are properties on the response
-        const functionCalls = response.functionCalls || []
+        const functionCallsList = response.functionCalls || []
 
-        if (functionCalls.length > 0) {
-            const call = functionCalls[0]
+        if (functionCallsList.length > 0) {
+            const call = functionCallsList[0]
 
             const executionResult = executeFunctionCall(
                 call.name as string,
-                call.args,
-                documentContent as string
+                (call.args ?? {}) as Record<string, unknown>,
+                documentContent
             )
 
             if (!executionResult.success) {
@@ -123,21 +135,23 @@ If you are analyzing a file (image/pdf/etc), use its context to help the user ed
 
 The document has been updated successfully using the ${call.name} tool. Briefly confirm the change to the user and ask if they need anything else.`
 
-            const finalResponse: any = await genAI.models.generateContent({
+            const finalContents: Content[] = [
+                ...contents,
+                { role: 'model', parts: [{ functionCall: { name: call.name!, args: call.args } }] },
+                {
+                    role: 'user',
+                    parts: [{
+                        functionResponse: {
+                            name: call.name!,
+                            response: executionResult as Record<string, unknown>
+                        }
+                    }]
+                }
+            ]
+
+            const finalResponse = await genAI.models.generateContent({
                 model: modelName,
-                contents: [
-                    ...contents,
-                    { role: 'model', parts: [{ functionCall: call }] },
-                    {
-                        role: 'user',
-                        parts: [{
-                            functionResponse: {
-                                name: call.name,
-                                response: executionResult
-                            }
-                        }]
-                    }
-                ] as any,
+                contents: finalContents,
                 config: {
                     systemInstruction: finalSystemPrompt
                 }
@@ -167,13 +181,13 @@ The document has been updated successfully using the ${call.name} tool. Briefly 
                 content: plainAssistantText
             }
         })
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('API Error:', error)
+        const message = error instanceof Error ? error.message : 'Unknown error'
         return NextResponse.json(
             {
                 error: 'Failed to process request',
-                message: error.message,
-                details: error
+                message,
             },
             { status: 500 }
         )
