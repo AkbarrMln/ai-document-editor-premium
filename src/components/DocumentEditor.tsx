@@ -7,13 +7,36 @@ import 'prismjs/components/prism-markdown'
 import 'prismjs/components/prism-javascript'
 import 'prismjs/components/prism-typescript'
 import 'prismjs/components/prism-css'
+import { CursorOverlay } from './CursorOverlay'
+import type { CollaboratorPresence } from '@/hooks/useCollaboration'
 
 interface Props {
   content: string
   onChange: (content: string) => void
+  collaborators?: CollaboratorPresence[]
+  onCursorMove?: (line: number, col: number) => void
 }
 
-export default function DocumentEditor({ content, onChange }: Props) {
+export default function DocumentEditor({ content, onChange, collaborators = [], onCursorMove }: Props) {
+
+  // Track cursor position for collaboration
+  const getCursorPosition = (textarea: HTMLTextAreaElement): { line: number; col: number } => {
+    const value = textarea.value
+    const selectionStart = textarea.selectionStart ?? 0
+    const textBeforeCursor = value.substring(0, selectionStart)
+    const lines = textBeforeCursor.split('\n')
+    return {
+      line: lines.length,
+      col: lines[lines.length - 1].length,
+    }
+  }
+
+  const handleCursorMove = (e: React.SyntheticEvent) => {
+    const textarea = e.target as HTMLTextAreaElement
+    if (!textarea || !onCursorMove) return
+    const pos = getCursorPosition(textarea)
+    onCursorMove(pos.line, pos.col)
+  }
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const lineNumbersRef = useRef<HTMLDivElement>(null)
   const codeRef = useRef<HTMLElement>(null)
@@ -181,11 +204,19 @@ export default function DocumentEditor({ content, onChange }: Props) {
             </code>
           </pre>
 
+          <CursorOverlay
+            collaborators={collaborators}
+            content={content}
+          />
+
           <textarea
             ref={textareaRef}
             value={content}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => { onChange(e.target.value); handleCursorMove(e); }}
             onScroll={handleScroll}
+            onMouseUp={handleCursorMove}
+            onKeyUp={handleCursorMove}
+            onSelect={handleCursorMove}
             spellCheck={false}
             className="bg-transparent caret-blue-600 dark:caret-blue-400 focus:outline-none z-10 selection:bg-blue-200/50 dark:selection:bg-blue-500/20"
             style={{

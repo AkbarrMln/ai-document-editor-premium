@@ -1,36 +1,82 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Panel, Group, Separator } from 'react-resizable-panels'
 import DocumentEditor from '@/components/DocumentEditor'
 import AIChat from '@/components/AIChat'
 import { DocsSidebar } from '@/components/DocsSidebar'
 import { useAuth } from '@/components/AuthProvider'
+import { PresenceIndicator } from '@/components/PresenceIndicator'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import { getDocument, type DocumentSummary } from '@/lib/documents'
 import { useAutoSave } from '@/hooks/useAutoSave'
+import { useCollaboration } from '@/hooks/useCollaboration'
+import { useThrottle } from '@/hooks/useThrottle'
+import { useDebouncedCallback } from '@/hooks/useDebouncedCallback'
 
 export default function EditorPage() {
     const [documentContent, setDocumentContent] = useState('')
     const [activeDocument, setActiveDocument] = useState<DocumentSummary | null>(null)
     const { user } = useAuth()
     const router = useRouter()
-    const [isChecking, setIsChecking] = useState(true)
-    const [isDarkMode, setIsDarkMode] = useState(false)
+    const [isDarkMode, setIsDarkMode] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('theme') === 'dark'
+        }
+        return false
+    })
     const [isShareDialogOpen, setIsShareDialogOpen] = useState(false)
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
+    // Flag to prevent infinite loop: don't broadcast remote changes back
+    const isReceivingRemoteChange = useRef(false)
+
     const { saveStatus } = useAutoSave(activeDocument?.id ?? null, documentContent)
 
-    // Sync isDarkMode with localStorage
-    useEffect(() => {
-        const savedTheme = localStorage.getItem('theme')
-        if (savedTheme === 'dark') {
-            setIsDarkMode(true)
-            document.documentElement.classList.add('dark')
+    // Collaboration hook
+    const {
+        collaborators,
+        typingUsers,
+        isConnected,
+        broadcastContentChange,
+        updateCursor,
+    } = useCollaboration({
+        documentId: activeDocument?.id ?? '',
+        userId: user?.id ?? '',
+        displayName: user?.email?.split('@')[0] ?? 'Anonymous',
+        onContentChange: (newContent) => {
+            isReceivingRemoteChange.current = true
+            setDocumentContent(newContent)
+            setTimeout(() => { isReceivingRemoteChange.current = false }, 0)
+        },
+    })
+
+    // Throttle cursor updates (max 10x/sec)
+    const throttledUpdateCursor = useThrottle(updateCursor, 100)
+
+    // Debounce content broadcast (300ms after last keystroke)
+    const debouncedBroadcast = useDebouncedCallback(
+        (content: string) => broadcastContentChange(content),
+        300
+    )
+
+    // Handle local content changes — broadcast only our own edits
+    const handleContentChange = useCallback((newContent: string) => {
+        setDocumentContent(newContent)
+        if (!isReceivingRemoteChange.current) {
+            debouncedBroadcast(newContent)
         }
-    }, [])
+    }, [debouncedBroadcast])
+
+    // Sync dark mode class with DOM
+    useEffect(() => {
+        if (isDarkMode) {
+            document.documentElement.classList.add('dark')
+        } else {
+            document.documentElement.classList.remove('dark')
+        }
+    }, [isDarkMode])
 
     const toggleTheme = () => {
         const newTheme = !isDarkMode ? 'dark' : 'light'
@@ -53,14 +99,15 @@ export default function EditorPage() {
         if (!user) {
             const timer = setTimeout(() => {
                 if (!user) router.push('/login')
-                setIsChecking(false)
             }, 1000)
             return () => clearTimeout(timer)
         }
-        setIsChecking(false)
     }, [user, router])
 
-    // Realtime updates for active document
+    // Derive isChecking from user state — no effect needed
+    const isChecking = user === undefined
+
+    // Realtime updates for active document (postgres changes)
     useEffect(() => {
         if (!activeDocument) return
 
@@ -86,7 +133,7 @@ export default function EditorPage() {
         return () => {
             supabase.removeChannel(channel)
         }
-    }, [activeDocument?.id]) // intentionally only depend on id
+    }, [activeDocument?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Handle document selection
     const handleDocumentSelect = useCallback(async (doc: DocumentSummary) => {
@@ -169,6 +216,18 @@ export default function EditorPage() {
                                 <span className="text-[10px] text-red-500 font-medium">⚠ Gagal menyimpan</span>
                             )}
                         </div>
+
+                        {/* Presence Indicator */}
+                        {activeDocument && (
+                            <>
+                                <div className="h-4 w-px bg-gray-200 dark:bg-white/10"></div>
+                                <PresenceIndicator
+                                    collaborators={collaborators}
+                                    typingUsers={typingUsers}
+                                    isConnected={isConnected}
+                                />
+                            </>
+                        )}
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -221,7 +280,9 @@ export default function EditorPage() {
                                     <DocumentEditor
                                         key={activeDocument.id}
                                         content={documentContent}
-                                        onChange={setDocumentContent}
+                                        onChange={handleContentChange}
+                                        collaborators={collaborators}
+                                        onCursorMove={throttledUpdateCursor}
                                     />
                                 </div>
                             </Panel>
@@ -235,7 +296,7 @@ export default function EditorPage() {
                                     <AIChat
                                         key={activeDocument.id}
                                         documentContent={documentContent}
-                                        onDocumentUpdate={setDocumentContent}
+                                        onDocumentUpdate={handleContentChange}
                                     />
                                 </div>
                             </Panel>
