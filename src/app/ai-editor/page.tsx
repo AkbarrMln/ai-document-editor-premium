@@ -7,10 +7,13 @@ import AIChat from '@/components/AIChat'
 import { DocsSidebar } from '@/components/DocsSidebar'
 import { useAuth } from '@/components/AuthProvider'
 import { PresenceIndicator } from '@/components/PresenceIndicator'
+import { VersionTimeline } from '@/components/VersionTimeline'
+import { DiffModal } from '@/components/DiffModal'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import { getDocument, type DocumentSummary } from '@/lib/documents'
 import { useAutoSave } from '@/hooks/useAutoSave'
+import { useAutoSnapshot } from '@/hooks/useAutoSnapshot'
 import { useCollaboration } from '@/hooks/useCollaboration'
 import { useThrottle } from '@/hooks/useThrottle'
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback'
@@ -28,11 +31,20 @@ export default function EditorPage() {
     })
     const [isShareDialogOpen, setIsShareDialogOpen] = useState(false)
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+    const [showHistory, setShowHistory] = useState(false)
+    const [compareVersions, setCompareVersions] = useState<{ a: string; b: string } | null>(null)
 
     // Flag to prevent infinite loop: don't broadcast remote changes back
     const isReceivingRemoteChange = useRef(false)
 
     const { saveStatus } = useAutoSave(activeDocument?.id ?? null, documentContent)
+
+    // Auto-snapshot every 30 seconds
+    const { saveNamedVersion } = useAutoSnapshot({
+        documentId: activeDocument?.id ?? '',
+        content: documentContent,
+        userId: user?.id ?? '',
+    })
 
     // Collaboration hook
     const {
@@ -231,6 +243,43 @@ export default function EditorPage() {
                     </div>
 
                     <div className="flex items-center gap-2">
+                        {/* Save Version button */}
+                        {activeDocument && (
+                            <button
+                                onClick={async () => {
+                                    const label = prompt('Nama versi ini (opsional):')
+                                    if (label === null) return
+                                    try {
+                                        await saveNamedVersion(label)
+                                        alert('Versi tersimpan!')
+                                    } catch {
+                                        alert('Gagal menyimpan versi')
+                                    }
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-lg transition-all uppercase tracking-wider"
+                                title="Simpan versi manual"
+                            >
+                                💾 Save Version
+                            </button>
+                        )}
+
+                        {/* History button */}
+                        {activeDocument && (
+                            <button
+                                onClick={() => setShowHistory(!showHistory)}
+                                className={`flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all uppercase tracking-wider ${showHistory
+                                        ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10'
+                                        : 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10'
+                                    }`}
+                                title="Histori versi"
+                            >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                History
+                            </button>
+                        )}
+
                         {/* Share button */}
                         {activeDocument && (
                             <button
@@ -271,36 +320,55 @@ export default function EditorPage() {
                     </div>
                 </div>
 
-                {/* Editor + Chat area */}
+                {/* Editor + Chat + History area */}
                 {activeDocument ? (
-                    <div className="flex-1 overflow-hidden">
-                        <Group orientation="horizontal">
-                            <Panel defaultSize={60} minSize={30}>
-                                <div className="h-full overflow-hidden">
-                                    <DocumentEditor
-                                        key={activeDocument.id}
-                                        content={documentContent}
-                                        onChange={handleContentChange}
-                                        collaborators={collaborators}
-                                        onCursorMove={throttledUpdateCursor}
-                                    />
-                                </div>
-                            </Panel>
+                    <div className="flex-1 overflow-hidden flex">
+                        <div className="flex-1 overflow-hidden">
+                            <Group orientation="horizontal">
+                                <Panel defaultSize={60} minSize={30}>
+                                    <div className="h-full overflow-hidden">
+                                        <DocumentEditor
+                                            key={activeDocument.id}
+                                            content={documentContent}
+                                            onChange={handleContentChange}
+                                            collaborators={collaborators}
+                                            onCursorMove={throttledUpdateCursor}
+                                        />
+                                    </div>
+                                </Panel>
 
-                            <Separator className="w-1 px-[1px] transition-all bg-gray-100 dark:bg-white/5 hover:bg-blue-500 border-x border-gray-200 dark:border-white/5 cursor-col-resize group flex items-center justify-center">
-                                <div className="h-10 w-[1px] bg-gray-300 dark:bg-gray-700 group-hover:bg-blue-300"></div>
-                            </Separator>
+                                <Separator className="w-1 px-[1px] transition-all bg-gray-100 dark:bg-white/5 hover:bg-blue-500 border-x border-gray-200 dark:border-white/5 cursor-col-resize group flex items-center justify-center">
+                                    <div className="h-10 w-[1px] bg-gray-300 dark:bg-gray-700 group-hover:bg-blue-300"></div>
+                                </Separator>
 
-                            <Panel defaultSize={40} minSize={25}>
-                                <div className="h-full">
-                                    <AIChat
-                                        key={activeDocument.id}
-                                        documentContent={documentContent}
-                                        onDocumentUpdate={handleContentChange}
-                                    />
-                                </div>
-                            </Panel>
-                        </Group>
+                                <Panel defaultSize={40} minSize={25}>
+                                    <div className="h-full">
+                                        <AIChat
+                                            key={activeDocument.id}
+                                            documentContent={documentContent}
+                                            onDocumentUpdate={handleContentChange}
+                                        />
+                                    </div>
+                                </Panel>
+                            </Group>
+                        </div>
+
+                        {/* Version History Sidebar */}
+                        {showHistory && (
+                            <div className="w-72 shrink-0 h-full overflow-hidden">
+                                <VersionTimeline
+                                    documentId={activeDocument.id}
+                                    userId={user.id}
+                                    onCompare={(a, b) => {
+                                        setCompareVersions({ a, b })
+                                    }}
+                                    onContentRestore={(newContent) => {
+                                        setDocumentContent(newContent)
+                                    }}
+                                    onClose={() => setShowHistory(false)}
+                                />
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <div className="flex-1 flex items-center justify-center">
@@ -321,6 +389,15 @@ export default function EditorPage() {
                     documentId={activeDocument.id}
                     ownerId={user.id}
                     onClose={() => setIsShareDialogOpen(false)}
+                />
+            )}
+
+            {/* Diff Modal */}
+            {compareVersions && (
+                <DiffModal
+                    versionIdA={compareVersions.a}
+                    versionIdB={compareVersions.b}
+                    onClose={() => setCompareVersions(null)}
                 />
             )}
         </div>
