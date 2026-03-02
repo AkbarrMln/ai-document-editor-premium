@@ -4,7 +4,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { functionDeclarations } from '@/lib/function-tools'
 import { executeFunctionCall } from '@/lib/execute-function'
 
-const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! })
+function getGenAI() {
+    const apiKey = process.env.GEMINI_API_KEY
+    if (!apiKey) throw new Error('GEMINI_API_KEY is not set')
+    return new GoogleGenAI({ apiKey })
+}
 
 function formatDocumentForAI(content: string): string {
     const lines = content.split('\n')
@@ -24,6 +28,7 @@ interface ChatRequestBody {
 
 export async function POST(request: NextRequest) {
     try {
+        const genAI = getGenAI()
         const body = (await request.json()) as ChatRequestBody
         const { messages, documentContent, file } = body
 
